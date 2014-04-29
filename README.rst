@@ -1,8 +1,5 @@
-api-client-go
-=========
----------------
-|Build Status|_
----------------
+api-client-go  |Build Status|_
+==============================
 
 .. |Build Status| image:: https://travis-ci.org/googlegenomics/api-client-go.png?branch=master
 .. _Build Status: https://travis-ci.org/googlegenomics/api-client-go
