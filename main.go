@@ -27,7 +27,7 @@ import (
 
 	"code.google.com/p/goauth2/oauth"
 
-	genomics "github.com/GoogleCloudPlatform/genomics-tools/client-go/v1beta"
+	genomics "github.com/googlegenomics/api-client-go/v1beta"
 )
 
 var (
