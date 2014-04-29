@@ -1,5 +1,12 @@
 api-client-go
 =========
+---------------
+|Build Status|_
+---------------
+
+.. |Build Status| image:: https://travis-ci.org/googlegenomics/api-client-go.png?branch=master
+.. _Build Status: https://travis-ci.org/googlegenomics/api-client-go
+
 
 The file ``main.go`` demonstrates how easy it is to use the `Google Genomics
 API`_ with the `Go programming language`_.
