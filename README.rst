@@ -18,12 +18,12 @@ Getting started
   instructions <https://developers.google.com/genomics#authenticate>`_ and
   download the JSON file for ``installed application``.
 
-* Install `goauth2 <http://code.google.com/p/goauth2>`_::
+* Install the example with::
 
-  go get code.google.com/p/goauth2/oauth
+   go get github.com/googlegenomics/api-client-go
 
 * Run the program with::
 
-  go run main.go -use_oauth client_secret.json
+   api-client-go -use_oauth client_secret.json
 
 
