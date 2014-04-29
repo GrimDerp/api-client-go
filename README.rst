@@ -1,4 +1,4 @@
-client-go
+api-client-go
 =========
 
 The file ``main.go`` demonstrates how easy it is to use the `Google Genomics
