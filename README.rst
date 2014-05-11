@@ -22,8 +22,17 @@ Getting started
 
    go get github.com/googlegenomics/api-client-go
 
-* Run the program with::
+* To see supported commands, run the program with::
 
-   api-client-go -use_oauth client_secret.json
+   api-client-go
 
+* To know about the flags in a particular command, run with ``help``, e.g.::
 
+   api-client-go help
+   api-client-go help readsets
+   api-client-go help readsets search
+
+* To search for a readsets, run with::
+
+   api-client-go readsets search --use-oauth=client_secret.json --dataset_ids \
+     376902546192
