@@ -17,7 +17,6 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -28,11 +27,7 @@ import (
 	"code.google.com/p/goauth2/oauth"
 
 	genomics "github.com/googlegenomics/api-client-go/v1beta"
-)
-
-var (
-	oauthJsonFile = flag.String("use_oauth", "",
-		"Path to client_secrets.json")
+	"github.com/spf13/cobra"
 )
 
 func obtainOauthCode(url string) string {
@@ -48,11 +43,11 @@ func obtainOauthCode(url string) string {
 }
 
 func prepareClient() (*http.Client, error) {
-	if *oauthJsonFile == "" {
+	if oauthJsonFile == "" {
 		return &http.Client{}, nil
 	}
 
-	jsonData, err := ioutil.ReadFile(*oauthJsonFile)
+	jsonData, err := ioutil.ReadFile(oauthJsonFile)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +71,8 @@ func prepareClient() (*http.Client, error) {
 		ClientSecret: data.Installed.Client_Secret,
 		RedirectURL:  data.Installed.Redirect_Uris[0],
 		Scope: strings.Join([]string{
-			"https://www.googleapis.com/auth/genomics",
-			"https://www.googleapis.com/auth/devstorage.read_write",
+			genomics.GenomicsScope,
+			genomics.DevstorageRead_writeScope,
 		}, " "),
 		AuthURL:    data.Installed.Auth_Uri,
 		TokenURL:   data.Installed.Token_Uri,
@@ -101,8 +96,7 @@ func prepareClient() (*http.Client, error) {
 	return client, nil
 }
 
-func main() {
-	flag.Parse()
+func NewApiClient() *genomics.Service {
 	client, err := prepareClient()
 	if err != nil {
 		log.Fatal(err)
@@ -111,42 +105,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	return baseApi
+}
 
-	fmt.Println("Searching for readsets in 1000 Genomes project...")
-	readsets, err := baseApi.Readsets.Search(&genomics.SearchReadsetsRequest{
-		DatasetIds: []string{"376902546192"},
-	}).Do()
-	if err != nil {
-		log.Fatal(err)
-	}
-	readset := readsets.Readsets[0]
-	readsetId := readset.Id
-	fmt.Printf("The first readset ID is %q.\n", readsetId)
+var oauthJsonFile string
 
-	_, err = baseApi.Readsets.Get(readsetId).Do()
-	if err != nil {
-		log.Fatal(err)
+func main() {
+	mainCmd := &cobra.Command{
+		Use:   os.Args[0],
+		Short: "Google Genomics API Go client",
 	}
-
-	fmt.Println("Searching for reads in the first sequence...")
-	sequenceName := readset.FileData[0].RefSequences[0].Name
-	tok := ""
-	for i := 1; i <= 2; i++ {
-		resp, err := baseApi.Reads.Search(&genomics.SearchReadsRequest{
-			PageToken:     tok,
-			ReadsetIds:    []string{readsetId},
-			SequenceName:  sequenceName,
-			SequenceStart: 1,
-			SequenceEnd:   ^uint64(0),
-		}).Do()
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("Found %v reads in page %v:\n", len(resp.Reads), i)
-		for _, read := range resp.Reads {
-			fmt.Printf("\tId: %v\tName: %v\n", read.Id, read.Name)
-		}
-		tok = resp.NextPageToken
-		fmt.Printf("Next page token is %q.\n", tok)
-	}
+	mainCmd.PersistentFlags().StringVarP(&oauthJsonFile, "use-oauth", "", "",
+		"Path to client_secret.json")
+	mainCmd.AddCommand(readsCmd)
+	mainCmd.AddCommand(readsetsCmd)
+	mainCmd.Execute()
+	os.Exit(0)
 }
