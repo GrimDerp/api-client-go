@@ -1,7 +1,6 @@
 // Copyright 2014 The Google Genomics API Client in Go Authors.
-// All rights reserved.
-// Use of this source code is governed by a Apache license that can be
-// found in the LICENSE file.
+// All rights reserved. Use of this source code is governed by
+// an Apache license that can be found in the LICENSE file.
 
 package main
 
