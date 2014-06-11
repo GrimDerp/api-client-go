@@ -10,4 +10,5 @@ install:
   go get -v ./...
 env:
   global:
+    - PATH=$HOME/gopath/bin:$PATH
     - secure: "Tnbpk989dMErUAyJHJJwTuLQ0Z145Py9/fr2mN2wfcKussI7RYkT9kh9104YO4sox+lfFLHyefdWrgLZOXlq/2q1OwG2UqJaHmpRNj29JCF1siy3PbmruIbSAedAhu/waIhteoqDn2iLEv7m5BmkemDif4aAMNdz4EcIL+y0dog="

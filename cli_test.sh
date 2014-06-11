@@ -3,8 +3,6 @@
 set -o nounset
 set -o errexit
 
-export PATH=$HOME/gopath/bin:$PATH
-
 api-client-go help 2>&1 | grep 'Reads functions'
 api-client-go help 2>&1 | grep readsets
 
