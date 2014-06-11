@@ -8,5 +8,7 @@ script:
   - ./cli_test.sh
 install:
   go get -v ./...
-KEY_PASSWORD:
-  secure: Np0pRS9Xp0ojSaNU4Cu/aic3i3oKooicUYjGTyb0z9OQ4jwmdKvo9cWlKoKXcPzqd/QgblvxCs5+fE/OX25brApGFQh8NjmlGbDBQ0V1ndzuJ9vHHAGVOsoemhoYlUWU9Dabw0mn3+dOo7HrqlUACIGlkgVp5KjxCPmsK1rIN6k=
+env:
+  global:
+    - PATH=$HOME/gopath/bin:$PATH
+    - secure: "Tnbpk989dMErUAyJHJJwTuLQ0Z145Py9/fr2mN2wfcKussI7RYkT9kh9104YO4sox+lfFLHyefdWrgLZOXlq/2q1OwG2UqJaHmpRNj29JCF1siy3PbmruIbSAedAhu/waIhteoqDn2iLEv7m5BmkemDif4aAMNdz4EcIL+y0dog="
