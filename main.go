@@ -152,6 +152,7 @@ func main() {
 	}
 	mainCmd.PersistentFlags().StringVarP(&oauthJsonFile, "use-oauth", "", "",
 		"Path to client_secret.json")
+	mainCmd.AddCommand(datasetsCmd)
 	mainCmd.AddCommand(readsCmd)
 	mainCmd.AddCommand(readsetsCmd)
 	mainCmd.Execute()

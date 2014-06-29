@@ -56,6 +56,7 @@ func New(client *http.Client) (*Service, error) {
 	s.Beacons = NewBeaconsService(s)
 	s.Callsets = NewCallsetsService(s)
 	s.Datasets = NewDatasetsService(s)
+	s.Experimental = NewExperimentalService(s)
 	s.Jobs = NewJobsService(s)
 	s.Reads = NewReadsService(s)
 	s.Readsets = NewReadsetsService(s)
@@ -72,6 +73,8 @@ type Service struct {
 	Callsets *CallsetsService
 
 	Datasets *DatasetsService
+
+	Experimental *ExperimentalService
 
 	Jobs *JobsService
 
@@ -106,6 +109,27 @@ func NewDatasetsService(s *Service) *DatasetsService {
 }
 
 type DatasetsService struct {
+	s *Service
+}
+
+func NewExperimentalService(s *Service) *ExperimentalService {
+	rs := &ExperimentalService{s: s}
+	rs.Jobs = NewExperimentalJobsService(s)
+	return rs
+}
+
+type ExperimentalService struct {
+	s *Service
+
+	Jobs *ExperimentalJobsService
+}
+
+func NewExperimentalJobsService(s *Service) *ExperimentalJobsService {
+	rs := &ExperimentalJobsService{s: s}
+	return rs
+}
+
+type ExperimentalJobsService struct {
 	s *Service
 }
 
@@ -159,14 +183,14 @@ type Call struct {
 	CallsetName string `json:"callsetName,omitempty"`
 
 	// Genotype: The genotype of this variant call. Each value represents
-	// either the value of the referenceBases field or is a 1-based index
-	// into alternateBases. If a variant had a referenceBases field of "T",
-	// an alternateBases value of ["A", "C"], and the genotype was [2, 1],
-	// that would mean the call represented the heterozygous value "CA" for
-	// this variant. If the genotype was instead [0, 1] the represented
-	// value would be "TA". Ordering of the genotype values is important if
-	// the phaseset field is present.
-	Genotype googleapi.Int64s `json:"genotype,omitempty"`
+	// either the value of the referenceBases field or a 1-based index into
+	// alternateBases. If a variant had a referenceBases field of "T" and an
+	// alternateBases value of ["A", "C"], and the genotype was [2, 1], that
+	// would mean the call represented the heterozygous value "CA" for this
+	// variant. If the genotype was instead [0, 1], the represented value
+	// would be "TA". Ordering of the genotype values is important if the
+	// phaseset field is present.
+	Genotype []int64 `json:"genotype,omitempty"`
 
 	// GenotypeLikelihood: The genotype likelihoods for this variant call.
 	// Each array entry represents how likely a specific genotype is for
@@ -175,16 +199,13 @@ type Call struct {
 	GenotypeLikelihood []float64 `json:"genotypeLikelihood,omitempty"`
 
 	// Info: A map of additional variant call information.
-	Info *CallInfo `json:"info,omitempty"`
+	Info map[string][]string `json:"info,omitempty"`
 
 	// Phaseset: If this field is present, this variant call's genotype
 	// ordering implies the phase of the bases and is consistent with any
 	// other variant calls on the same contig which have the same phaseset
 	// value.
 	Phaseset string `json:"phaseset,omitempty"`
-}
-
-type CallInfo struct {
 }
 
 type Callset struct {
@@ -195,21 +216,27 @@ type Callset struct {
 	// DatasetId: The ID of the dataset this callset belongs to.
 	DatasetId string `json:"datasetId,omitempty"`
 
-	// Id: The callset ID.
+	// Id: The Google generated ID of the callset, immutable.
 	Id string `json:"id,omitempty"`
 
 	// Info: A map of additional callset information.
-	Info *CallsetInfo `json:"info,omitempty"`
+	Info map[string][]string `json:"info,omitempty"`
 
 	// Name: The callset name.
 	Name string `json:"name,omitempty"`
 }
 
-type CallsetInfo struct {
+type ContigBound struct {
+	// Contig: The contig the bound is associate with.
+	Contig string `json:"contig,omitempty"`
+
+	// UpperBound: An upper bound (inclusive) on the starting coordinate of
+	// any variant in the contig.
+	UpperBound int64 `json:"upperBound,omitempty,string"`
 }
 
 type Dataset struct {
-	// Id: The dataset ID.
+	// Id: The Google generated ID of the dataset, immutable.
 	Id string `json:"id,omitempty"`
 
 	// IsPublic: Flag indicating whether or not a dataset is publicly
@@ -217,18 +244,52 @@ type Dataset struct {
 	// from its project.
 	IsPublic bool `json:"isPublic,omitempty"`
 
-	// ProjectId: The Google Cloud Console project number that this dataset
-	// belongs to.
+	// Name: The dataset name.
+	Name string `json:"name,omitempty"`
+
+	// ProjectId: The Google Developers Console project number that this
+	// dataset belongs to.
 	ProjectId int64 `json:"projectId,omitempty,string"`
+}
+
+type ExperimentalCreateJobRequest struct {
+	// Align: Specifies whether or not to run the alignment pipeline. At
+	// least one of align or call_variants must be provided.
+	Align bool `json:"align,omitempty"`
+
+	// CallVariants: Specifies whether or not to run the variant calling
+	// pipeline. If specified, alignment will be performed first and the
+	// aligned BAMs will passed as input to the variant caller. At least one
+	// of align or call_variants must be provided.
+	CallVariants bool `json:"callVariants,omitempty"`
+
+	// GcsOutputPath: Specifies where to copy the results of certain
+	// pipelines. This shoud be in the form of "gs://bucket/path".
+	GcsOutputPath string `json:"gcsOutputPath,omitempty"`
+
+	// ProjectId: Required. The Google Cloud Project ID with which to
+	// associate the request.
+	ProjectId int64 `json:"projectId,omitempty,string"`
+
+	// SourceUris: Required. A list of Google Cloud Storage URIs of data
+	// files to operate upon.
+	SourceUris []string `json:"sourceUris,omitempty"`
+}
+
+type ExperimentalCreateJobResponse struct {
+	// JobId: A job ID that can be used to get status information.
+	JobId string `json:"jobId,omitempty"`
 }
 
 type ExportReadsetsRequest struct {
 	// ExportUri: A Google Cloud Storage URI where the exported BAM file
-	// will be created.
+	// will be created. The currently authenticated user must have write
+	// access to the new file location. An error will be returned if the URI
+	// already contains data.
 	ExportUri string `json:"exportUri,omitempty"`
 
-	// ProjectId: The Google Cloud project number that owns this export.
-	// This is the project that will be billed.
+	// ProjectId: The Google Developers Console project number that owns
+	// this export. This is the project that will be billed.
 	ProjectId int64 `json:"projectId,omitempty,string"`
 
 	// ReadsetIds: The IDs of the readsets to export.
@@ -236,22 +297,29 @@ type ExportReadsetsRequest struct {
 }
 
 type ExportReadsetsResponse struct {
-	// ExportId: An export ID that can be used to get status information.
-	ExportId uint64 `json:"exportId,omitempty,string"`
+	// JobId: A job ID that can be used to get status information.
+	JobId string `json:"jobId,omitempty"`
 }
 
-type ExportRequest struct {
+type ExportVariantsRequest struct {
+	// BigqueryDataset: The BigQuery dataset to export data to. Note that
+	// this is distinct from the Genomics concept of "dataset". The caller
+	// must have WRITE access to this BigQuery dataset.
+	BigqueryDataset string `json:"bigqueryDataset,omitempty"`
+
+	// BigqueryTable: The BigQuery table to export data to. The caller must
+	// have WRITE access to this BigQuery table.
+	BigqueryTable string `json:"bigqueryTable,omitempty"`
+
 	// CallsetIds: If provided, only variant call information from the
 	// specified callsets will be exported. By default all variant calls are
 	// exported.
 	CallsetIds []string `json:"callsetIds,omitempty"`
 
-	// DatasetIds: The IDs of the datasets that contain variant data which
-	// should be exported. At least one dataset ID must be provided.
-	DatasetIds []string `json:"datasetIds,omitempty"`
-
-	// ExportUri: The URI to export to.
-	ExportUri string `json:"exportUri,omitempty"`
+	// DatasetId: Required. The ID of the dataset that contains variant data
+	// which should be exported. The caller must have READ access to this
+	// dataset.
+	DatasetId string `json:"datasetId,omitempty"`
 
 	// Format: The format for the exported data.
 	Format string `json:"format,omitempty"`
@@ -261,9 +329,15 @@ type ExportRequest struct {
 	ProjectId int64 `json:"projectId,omitempty,string"`
 }
 
-type ExportResponse struct {
+type ExportVariantsResponse struct {
 	// JobId: A job ID that can be used to get status information.
 	JobId string `json:"jobId,omitempty"`
+}
+
+type GetVariantsSummaryResponse struct {
+	// ContigBounds: A list of all contigs used by the variants in a dataset
+	// with associated coordinate upper bounds for each one.
+	ContigBounds []*ContigBound `json:"contigBounds,omitempty"`
 }
 
 type Header struct {
@@ -278,7 +352,7 @@ type HeaderSection struct {
 	// Comments: (@CO) One-line text comments.
 	Comments []string `json:"comments,omitempty"`
 
-	// FileUri: The file uri that this data was imported from.
+	// FileUri: The file URI that this data was imported from.
 	FileUri string `json:"fileUri,omitempty"`
 
 	// Headers: (@HD) The header line.
@@ -295,7 +369,8 @@ type HeaderSection struct {
 }
 
 type ImportReadsetsRequest struct {
-	// DatasetId: Required. The ID of the dataset this readset belongs to.
+	// DatasetId: Required. The ID of the dataset these readsets will belong
+	// to.
 	DatasetId string `json:"datasetId,omitempty"`
 
 	// SourceUris: A list of URIs pointing at BAM or FASTQ files in Google
@@ -308,7 +383,7 @@ type ImportReadsetsResponse struct {
 	JobId string `json:"jobId,omitempty"`
 }
 
-type ImportRequest struct {
+type ImportVariantsRequest struct {
 	// DatasetId: Required. The dataset to which variant data should be
 	// imported.
 	DatasetId string `json:"datasetId,omitempty"`
@@ -319,7 +394,7 @@ type ImportRequest struct {
 	SourceUris []string `json:"sourceUris,omitempty"`
 }
 
-type ImportResponse struct {
+type ImportVariantsResponse struct {
 	// JobId: A job ID that can be used to get status information.
 	JobId string `json:"jobId,omitempty"`
 }
@@ -329,19 +404,25 @@ type Job struct {
 	// status.
 	Description string `json:"description,omitempty"`
 
+	// Errors: Any errors that occurred during processing.
+	Errors []string `json:"errors,omitempty"`
+
 	// Id: The job ID.
 	Id string `json:"id,omitempty"`
 
 	// ImportedIds: If this Job represents an import, this field will
-	// contain the IDs of the objects which were successfully imported.
+	// contain the IDs of the objects that were successfully imported.
 	ImportedIds []string `json:"importedIds,omitempty"`
 
-	// ProjectId: The Google Cloud Console project number that this job
-	// belongs to.
+	// ProjectId: The Google Developers Console project number to which this
+	// job belongs.
 	ProjectId int64 `json:"projectId,omitempty,string"`
 
 	// Status: The status of this job.
 	Status string `json:"status,omitempty"`
+
+	// Warnings: Any warnings that occurred during processing.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 type ListDatasetsResponse struct {
@@ -365,7 +446,7 @@ type Program struct {
 	// Name: (PN) Program name.
 	Name string `json:"name,omitempty"`
 
-	// PrevProgramId: (PP) Previous program id.
+	// PrevProgramId: (PP) Previous program ID.
 	PrevProgramId string `json:"prevProgramId,omitempty"`
 
 	// Version: (VN) Program version.
@@ -391,11 +472,12 @@ type Read struct {
 	// See the full BAM spec for more details. (FLAG)
 	Flags int64 `json:"flags,omitempty"`
 
-	// Id: The read ID.
+	// Id: The Google generated ID of the read, immutable.
 	Id string `json:"id,omitempty"`
 
 	// MappingQuality: A score up to 255 that represents how likely this
-	// read's aligned position is correct. A higher value is better. (MAPQ)
+	// read's aligned position is to be correct. A higher value is better.
+	// (MAPQ)
 	MappingQuality int64 `json:"mappingQuality,omitempty"`
 
 	// MatePosition: The 1-based start position of the paired read. (PNEXT)
@@ -410,8 +492,8 @@ type Read struct {
 	// the query template name. (QNAME)
 	Name string `json:"name,omitempty"`
 
-	// OriginalBases: The list of bases that this read represents (e.g.
-	// 'CATCGA'). (SEQ)
+	// OriginalBases: The list of bases that this read represents (such as
+	// "CATCGA"). (SEQ)
 	OriginalBases string `json:"originalBases,omitempty"`
 
 	// Position: The 1-based start position of the aligned read. If the
@@ -423,23 +505,20 @@ type Read struct {
 	ReadsetId string `json:"readsetId,omitempty"`
 
 	// ReferenceSequenceName: The name of the sequence that this read is
-	// aligned to. This would be 'X' for the X Chromosome or '20' for
-	// Chromosome 20. (RNAME)
+	// aligned to. This would be, for example, 'X' for the X Chromosome or
+	// '20' for Chromosome 20. (RNAME)
 	ReferenceSequenceName string `json:"referenceSequenceName,omitempty"`
 
 	// Tags: A map of additional read information. (TAG)
-	Tags *ReadTags `json:"tags,omitempty"`
+	Tags map[string][]string `json:"tags,omitempty"`
 
-	// TemplateLength: Length of the original piece of dna that produced
+	// TemplateLength: Length of the original piece of DNA that produced
 	// both this read and the paired read. (TLEN)
 	TemplateLength int64 `json:"templateLength,omitempty"`
 }
 
-type ReadTags struct {
-}
-
 type ReadGroup struct {
-	// Date: (DT) Date the run was produced (ISO8601 date or date/time.)
+	// Date: (DT) Date the run was produced (ISO8601 date or date/time).
 	Date string `json:"date,omitempty"`
 
 	// Description: (DS) Description.
@@ -481,7 +560,7 @@ type ReadGroup struct {
 }
 
 type Readset struct {
-	// Created: The date this readset was created in milliseconds from the
+	// Created: The date this readset was created, in milliseconds from the
 	// epoch.
 	Created int64 `json:"created,omitempty,string"`
 
@@ -492,10 +571,10 @@ type Readset struct {
 	// format specification for additional information on each field.
 	FileData []*HeaderSection `json:"fileData,omitempty"`
 
-	// Id: The readset ID.
+	// Id: The Google generated ID of the readset, immutable.
 	Id string `json:"id,omitempty"`
 
-	// Name: The readset name.
+	// Name: The readset name, typically this is the sample name.
 	Name string `json:"name,omitempty"`
 
 	// ReadCount: The number of reads in this readset.
@@ -524,11 +603,15 @@ type ReferenceSequence struct {
 }
 
 type SearchCallsetsRequest struct {
-	// DatasetIds: If specified, will restrict the query to callsets within
-	// the given datasets.
+	// DatasetIds: Restrict the query to callsets within the given datasets.
+	// At least one ID must be provided.
 	DatasetIds []string `json:"datasetIds,omitempty"`
 
-	// Name: Only return callsets with names matching this substring.
+	// MaxResults: The maximum number of callsets to return.
+	MaxResults uint64 `json:"maxResults,omitempty,string"`
+
+	// Name: Only return callsets for which a substring of the name matches
+	// this string.
 	Name string `json:"name,omitempty"`
 
 	// PageToken: The continuation token, which is used to page through
@@ -549,32 +632,31 @@ type SearchCallsetsResponse struct {
 }
 
 type SearchReadsRequest struct {
-	// DatasetIds: If specified, will restrict this query to reads within
-	// the given datasets. At least one dataset ID or a readset ID must be
-	// provided.
-	DatasetIds []string `json:"datasetIds,omitempty"`
-
 	// PageToken: The continuation token, which is used to page through
 	// large result sets. To get the next page of results, set this
 	// parameter to the value of "nextPageToken" from the previous response.
 	PageToken string `json:"pageToken,omitempty"`
 
-	// ReadsetIds: If specified, will restrict this query to reads within
-	// the given readsets. At least one dataset ID or a readset ID must be
-	// provided.
+	// ReadsetIds: The readsets within which to search for reads. At least
+	// one readset ID must be provided. All specified readsets must be
+	// aligned against a common set of reference sequences; this defines the
+	// genomic coordinates for the query.
 	ReadsetIds []string `json:"readsetIds,omitempty"`
 
-	// SequenceEnd: The end position (1-based, inclusive) of this query. If
-	// a sequence name is specified, this defaults to the sequence's length.
+	// SequenceEnd: The end position (1-based, inclusive) of the target
+	// range. If specified, sequenceName must also be specified. Defaults to
+	// the end of the target reference sequence, if any.
 	SequenceEnd uint64 `json:"sequenceEnd,omitempty,string"`
 
-	// SequenceName: The sequence to query. (e.g. 'X' for the X chromosome)
-	// Leaving this blank returns results from all sequences, including
-	// unmapped reads.
+	// SequenceName: Restricts the results to a particular reference
+	// sequence such as '1', 'chr1', or 'X'. The set of valid references
+	// sequences depends on the readsets specified. If set to "", only
+	// unmapped Reads are returned.
 	SequenceName string `json:"sequenceName,omitempty"`
 
-	// SequenceStart: The start position (1-based) of this query. If a
-	// sequence name is specified, this defaults to 1.
+	// SequenceStart: The start position (1-based, inclusive) of the target
+	// range. If specified, sequenceName must also be specified. Defaults to
+	// the start of the target reference sequence, if any.
 	SequenceStart uint64 `json:"sequenceStart,omitempty,string"`
 }
 
@@ -586,8 +668,9 @@ type SearchReadsResponse struct {
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
 	// Reads: The list of matching Reads. The resulting Reads are sorted by
-	// position. Unmapped reads, which have no position, are returned last
-	// and are further sorted by name.
+	// position; the smallest positions are returned first. Unmapped reads,
+	// which have no position, are returned last and are further sorted
+	// alphabetically by name.
 	Reads []*Read `json:"reads,omitempty"`
 }
 
@@ -596,7 +679,8 @@ type SearchReadsetsRequest struct {
 	// datasets. At least one ID must be provided.
 	DatasetIds []string `json:"datasetIds,omitempty"`
 
-	// Name: Only return readsets with names matching this substring.
+	// Name: Only return readsets for which a substring of the name matches
+	// this string.
 	Name string `json:"name,omitempty"`
 
 	// PageToken: The continuation token, which is used to page through
@@ -646,8 +730,8 @@ type SearchVariantsRequest struct {
 	// parameter to the value of "nextPageToken" from the previous response.
 	PageToken string `json:"pageToken,omitempty"`
 
-	// StartPosition: Required. The beginning of the window (1-based) for
-	// which overlapping variants should be returned.
+	// StartPosition: Required. The beginning of the window (1-based,
+	// inclusive) for which overlapping variants should be returned.
 	StartPosition int64 `json:"startPosition,omitempty,string"`
 
 	// VariantName: Only return variants which have exactly this name.
@@ -674,22 +758,22 @@ type Variant struct {
 	// variant.
 	Calls []*Call `json:"calls,omitempty"`
 
-	// Contig: The contig on which this variant occurs. (e.g. 'chr20' or
+	// Contig: The contig on which this variant occurs. (such as 'chr20' or
 	// 'X')
 	Contig string `json:"contig,omitempty"`
 
-	// Created: The date this variant was created in milliseconds from the
+	// Created: The date this variant was created, in milliseconds from the
 	// epoch.
 	Created int64 `json:"created,omitempty,string"`
 
 	// DatasetId: The ID of the dataset this variant belongs to.
 	DatasetId string `json:"datasetId,omitempty"`
 
-	// Id: The variant ID.
+	// Id: The Google generated ID of the variant, immutable.
 	Id string `json:"id,omitempty"`
 
 	// Info: A map of additional variant information.
-	Info *VariantInfo `json:"info,omitempty"`
+	Info map[string][]string `json:"info,omitempty"`
 
 	// Names: Names for the variant, for example a RefSNP ID.
 	Names []string `json:"names,omitempty"`
@@ -701,9 +785,6 @@ type Variant struct {
 	// ReferenceBases: The reference bases for this variant. They start at
 	// the given position.
 	ReferenceBases string `json:"referenceBases,omitempty"`
-}
-
-type VariantInfo struct {
 }
 
 // method id "genomics.beacons.get":
@@ -770,8 +851,8 @@ func (c *BeaconsGetCall) Do() (*Beacon, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Beacon)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Beacon
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -852,8 +933,8 @@ func (c *CallsetsCreateCall) Do() (*Callset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Callset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Callset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -965,8 +1046,8 @@ func (c *CallsetsGetCall) Do() (*Callset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Callset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Callset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1037,8 +1118,8 @@ func (c *CallsetsPatchCall) Do() (*Callset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Callset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Callset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1109,8 +1190,8 @@ func (c *CallsetsSearchCall) Do() (*SearchCallsetsResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(SearchCallsetsResponse)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *SearchCallsetsResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1173,8 +1254,8 @@ func (c *CallsetsUpdateCall) Do() (*Callset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Callset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Callset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1245,8 +1326,8 @@ func (c *DatasetsCreateCall) Do() (*Dataset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Dataset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Dataset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1358,8 +1439,8 @@ func (c *DatasetsGetCall) Do() (*Dataset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Dataset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Dataset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1402,6 +1483,13 @@ func (r *DatasetsService) List() *DatasetsListCall {
 	return c
 }
 
+// MaxResults sets the optional parameter "maxResults": The maximum
+// number of results returned by this request.
+func (c *DatasetsListCall) MaxResults(maxResults uint64) *DatasetsListCall {
+	c.opt_["maxResults"] = maxResults
+	return c
+}
+
 // PageToken sets the optional parameter "pageToken": The continuation
 // token, which is used to page through large result sets. To get the
 // next page of results, set this parameter to the value of
@@ -1411,8 +1499,8 @@ func (c *DatasetsListCall) PageToken(pageToken string) *DatasetsListCall {
 	return c
 }
 
-// ProjectId sets the optional parameter "projectId": The Google Cloud
-// Console project number.
+// ProjectId sets the optional parameter "projectId": Only return
+// datasets which belong to this Google Developers Console project.
 func (c *DatasetsListCall) ProjectId(projectId int64) *DatasetsListCall {
 	c.opt_["projectId"] = projectId
 	return c
@@ -1422,6 +1510,9 @@ func (c *DatasetsListCall) Do() (*ListDatasetsResponse, error) {
 	var body io.Reader = nil
 	params := make(url.Values)
 	params.Set("alt", "json")
+	if v, ok := c.opt_["maxResults"]; ok {
+		params.Set("maxResults", fmt.Sprintf("%v", v))
+	}
 	if v, ok := c.opt_["pageToken"]; ok {
 		params.Set("pageToken", fmt.Sprintf("%v", v))
 	}
@@ -1441,8 +1532,8 @@ func (c *DatasetsListCall) Do() (*ListDatasetsResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(ListDatasetsResponse)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *ListDatasetsResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1451,13 +1542,20 @@ func (c *DatasetsListCall) Do() (*ListDatasetsResponse, error) {
 	//   "httpMethod": "GET",
 	//   "id": "genomics.datasets.list",
 	//   "parameters": {
+	//     "maxResults": {
+	//       "default": "50",
+	//       "description": "The maximum number of results returned by this request.",
+	//       "format": "uint64",
+	//       "location": "query",
+	//       "type": "string"
+	//     },
 	//     "pageToken": {
 	//       "description": "The continuation token, which is used to page through large result sets. To get the next page of results, set this parameter to the value of \"nextPageToken\" from the previous response.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "projectId": {
-	//       "description": "The Google Cloud Console project number.",
+	//       "description": "Only return datasets which belong to this Google Developers Console project.",
 	//       "format": "int64",
 	//       "location": "query",
 	//       "type": "string"
@@ -1515,8 +1613,8 @@ func (c *DatasetsPatchCall) Do() (*Dataset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Dataset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Dataset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1590,8 +1688,8 @@ func (c *DatasetsUpdateCall) Do() (*Dataset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Dataset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Dataset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1618,6 +1716,69 @@ func (c *DatasetsUpdateCall) Do() (*Dataset, error) {
 	//     "$ref": "Dataset"
 	//   },
 	//   "scopes": [
+	//     "https://www.googleapis.com/auth/genomics"
+	//   ]
+	// }
+
+}
+
+// method id "genomics.experimental.jobs.create":
+
+type ExperimentalJobsCreateCall struct {
+	s                            *Service
+	experimentalcreatejobrequest *ExperimentalCreateJobRequest
+	opt_                         map[string]interface{}
+}
+
+// Create: Creates and asynchronously runs an ad-hoc job. This is an
+// experimental call and may be removed or changed at any time.
+func (r *ExperimentalJobsService) Create(experimentalcreatejobrequest *ExperimentalCreateJobRequest) *ExperimentalJobsCreateCall {
+	c := &ExperimentalJobsCreateCall{s: r.s, opt_: make(map[string]interface{})}
+	c.experimentalcreatejobrequest = experimentalcreatejobrequest
+	return c
+}
+
+func (c *ExperimentalJobsCreateCall) Do() (*ExperimentalCreateJobResponse, error) {
+	var body io.Reader = nil
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.experimentalcreatejobrequest)
+	if err != nil {
+		return nil, err
+	}
+	ctype := "application/json"
+	params := make(url.Values)
+	params.Set("alt", "json")
+	urls := googleapi.ResolveRelative(c.s.BasePath, "experimental/jobs/create")
+	urls += "?" + params.Encode()
+	req, _ := http.NewRequest("POST", urls, body)
+	googleapi.SetOpaque(req.URL)
+	req.Header.Set("Content-Type", ctype)
+	req.Header.Set("User-Agent", "google-api-go-client/0.5")
+	res, err := c.s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	var ret *ExperimentalCreateJobResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Creates and asynchronously runs an ad-hoc job. This is an experimental call and may be removed or changed at any time.",
+	//   "httpMethod": "POST",
+	//   "id": "genomics.experimental.jobs.create",
+	//   "path": "experimental/jobs/create",
+	//   "request": {
+	//     "$ref": "ExperimentalCreateJobRequest"
+	//   },
+	//   "response": {
+	//     "$ref": "ExperimentalCreateJobResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/devstorage.read_write",
 	//     "https://www.googleapis.com/auth/genomics"
 	//   ]
 	// }
@@ -1657,8 +1818,8 @@ func (c *JobsGetCall) Do() (*Job, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Job)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Job
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1721,8 +1882,8 @@ func (c *ReadsGetCall) Do() (*Read, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Read)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Read
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1760,7 +1921,13 @@ type ReadsSearchCall struct {
 	opt_               map[string]interface{}
 }
 
-// Search: Gets a list of reads matching the criteria.
+// Search: Gets a list of reads for one or more readsets. SearchReads
+// operates over a genomic coordinate space of sequence+position defined
+// over the reference sequences to which the requested readsets are
+// aligned. If a target positional range is specified, SearchReads
+// returns all reads whose alignment to the reference genome overlap the
+// range. A query which specifies only readset IDs yields all reads in
+// those readsets, including unmapped reads.
 func (r *ReadsService) Search(searchreadsrequest *SearchReadsRequest) *ReadsSearchCall {
 	c := &ReadsSearchCall{s: r.s, opt_: make(map[string]interface{})}
 	c.searchreadsrequest = searchreadsrequest
@@ -1790,13 +1957,13 @@ func (c *ReadsSearchCall) Do() (*SearchReadsResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(SearchReadsResponse)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *SearchReadsResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
 	// {
-	//   "description": "Gets a list of reads matching the criteria.",
+	//   "description": "Gets a list of reads for one or more readsets. SearchReads operates over a genomic coordinate space of sequence+position defined over the reference sequences to which the requested readsets are aligned. If a target positional range is specified, SearchReads returns all reads whose alignment to the reference genome overlap the range. A query which specifies only readset IDs yields all reads in those readsets, including unmapped reads.",
 	//   "httpMethod": "POST",
 	//   "id": "genomics.reads.search",
 	//   "path": "reads/search",
@@ -1851,8 +2018,8 @@ func (c *ReadsetsCreateCall) Do() (*Readset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Readset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Readset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -1969,8 +2136,8 @@ func (c *ReadsetsExportCall) Do() (*ExportReadsetsResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(ExportReadsetsResponse)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *ExportReadsetsResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2026,8 +2193,8 @@ func (c *ReadsetsGetCall) Do() (*Readset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Readset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Readset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2096,8 +2263,8 @@ func (c *ReadsetsImportCall) Do() (*ImportReadsetsResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(ImportReadsetsResponse)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *ImportReadsetsResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2161,8 +2328,8 @@ func (c *ReadsetsPatchCall) Do() (*Readset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Readset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Readset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2233,8 +2400,8 @@ func (c *ReadsetsSearchCall) Do() (*SearchReadsetsResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(SearchReadsetsResponse)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *SearchReadsetsResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2297,8 +2464,8 @@ func (c *ReadsetsUpdateCall) Do() (*Readset, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Readset)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Readset
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2369,8 +2536,8 @@ func (c *VariantsCreateCall) Do() (*Variant, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Variant)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Variant
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2452,21 +2619,21 @@ func (c *VariantsDeleteCall) Do() error {
 // method id "genomics.variants.export":
 
 type VariantsExportCall struct {
-	s             *Service
-	exportrequest *ExportRequest
-	opt_          map[string]interface{}
+	s                     *Service
+	exportvariantsrequest *ExportVariantsRequest
+	opt_                  map[string]interface{}
 }
 
 // Export: Exports variant data to an external destination.
-func (r *VariantsService) Export(exportrequest *ExportRequest) *VariantsExportCall {
+func (r *VariantsService) Export(exportvariantsrequest *ExportVariantsRequest) *VariantsExportCall {
 	c := &VariantsExportCall{s: r.s, opt_: make(map[string]interface{})}
-	c.exportrequest = exportrequest
+	c.exportvariantsrequest = exportvariantsrequest
 	return c
 }
 
-func (c *VariantsExportCall) Do() (*ExportResponse, error) {
+func (c *VariantsExportCall) Do() (*ExportVariantsResponse, error) {
 	var body io.Reader = nil
-	body, err := googleapi.WithoutDataWrapper.JSONReader(c.exportrequest)
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.exportvariantsrequest)
 	if err != nil {
 		return nil, err
 	}
@@ -2487,8 +2654,8 @@ func (c *VariantsExportCall) Do() (*ExportResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(ExportResponse)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *ExportVariantsResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2498,10 +2665,10 @@ func (c *VariantsExportCall) Do() (*ExportResponse, error) {
 	//   "id": "genomics.variants.export",
 	//   "path": "variants/export",
 	//   "request": {
-	//     "$ref": "ExportRequest"
+	//     "$ref": "ExportVariantsRequest"
 	//   },
 	//   "response": {
-	//     "$ref": "ExportResponse"
+	//     "$ref": "ExportVariantsResponse"
 	//   },
 	//   "scopes": [
 	//     "https://www.googleapis.com/auth/genomics"
@@ -2543,8 +2710,8 @@ func (c *VariantsGetCall) Do() (*Variant, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Variant)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Variant
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2574,25 +2741,92 @@ func (c *VariantsGetCall) Do() (*Variant, error) {
 
 }
 
+// method id "genomics.variants.getSummary":
+
+type VariantsGetSummaryCall struct {
+	s    *Service
+	opt_ map[string]interface{}
+}
+
+// GetSummary: Gets a summary of all the variant data in a dataset.
+func (r *VariantsService) GetSummary() *VariantsGetSummaryCall {
+	c := &VariantsGetSummaryCall{s: r.s, opt_: make(map[string]interface{})}
+	return c
+}
+
+// DatasetId sets the optional parameter "datasetId": Required. The ID
+// of the dataset to get variant summary information for.
+func (c *VariantsGetSummaryCall) DatasetId(datasetId string) *VariantsGetSummaryCall {
+	c.opt_["datasetId"] = datasetId
+	return c
+}
+
+func (c *VariantsGetSummaryCall) Do() (*GetVariantsSummaryResponse, error) {
+	var body io.Reader = nil
+	params := make(url.Values)
+	params.Set("alt", "json")
+	if v, ok := c.opt_["datasetId"]; ok {
+		params.Set("datasetId", fmt.Sprintf("%v", v))
+	}
+	urls := googleapi.ResolveRelative(c.s.BasePath, "variants/summary")
+	urls += "?" + params.Encode()
+	req, _ := http.NewRequest("GET", urls, body)
+	googleapi.SetOpaque(req.URL)
+	req.Header.Set("User-Agent", "google-api-go-client/0.5")
+	res, err := c.s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer googleapi.CloseBody(res)
+	if err := googleapi.CheckResponse(res); err != nil {
+		return nil, err
+	}
+	var ret *GetVariantsSummaryResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+	// {
+	//   "description": "Gets a summary of all the variant data in a dataset.",
+	//   "httpMethod": "GET",
+	//   "id": "genomics.variants.getSummary",
+	//   "parameters": {
+	//     "datasetId": {
+	//       "description": "Required. The ID of the dataset to get variant summary information for.",
+	//       "location": "query",
+	//       "type": "string"
+	//     }
+	//   },
+	//   "path": "variants/summary",
+	//   "response": {
+	//     "$ref": "GetVariantsSummaryResponse"
+	//   },
+	//   "scopes": [
+	//     "https://www.googleapis.com/auth/genomics"
+	//   ]
+	// }
+
+}
+
 // method id "genomics.variants.import":
 
 type VariantsImportCall struct {
-	s             *Service
-	importrequest *ImportRequest
-	opt_          map[string]interface{}
+	s                     *Service
+	importvariantsrequest *ImportVariantsRequest
+	opt_                  map[string]interface{}
 }
 
 // Import: Creates variant data by asynchronously importing the provided
 // information.
-func (r *VariantsService) Import(importrequest *ImportRequest) *VariantsImportCall {
+func (r *VariantsService) Import(importvariantsrequest *ImportVariantsRequest) *VariantsImportCall {
 	c := &VariantsImportCall{s: r.s, opt_: make(map[string]interface{})}
-	c.importrequest = importrequest
+	c.importvariantsrequest = importvariantsrequest
 	return c
 }
 
-func (c *VariantsImportCall) Do() (*ImportResponse, error) {
+func (c *VariantsImportCall) Do() (*ImportVariantsResponse, error) {
 	var body io.Reader = nil
-	body, err := googleapi.WithoutDataWrapper.JSONReader(c.importrequest)
+	body, err := googleapi.WithoutDataWrapper.JSONReader(c.importvariantsrequest)
 	if err != nil {
 		return nil, err
 	}
@@ -2613,8 +2847,8 @@ func (c *VariantsImportCall) Do() (*ImportResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(ImportResponse)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *ImportVariantsResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2624,10 +2858,10 @@ func (c *VariantsImportCall) Do() (*ImportResponse, error) {
 	//   "id": "genomics.variants.import",
 	//   "path": "variants/import",
 	//   "request": {
-	//     "$ref": "ImportRequest"
+	//     "$ref": "ImportVariantsRequest"
 	//   },
 	//   "response": {
-	//     "$ref": "ImportResponse"
+	//     "$ref": "ImportVariantsResponse"
 	//   },
 	//   "scopes": [
 	//     "https://www.googleapis.com/auth/devstorage.read_write",
@@ -2678,8 +2912,8 @@ func (c *VariantsPatchCall) Do() (*Variant, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Variant)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Variant
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2750,8 +2984,8 @@ func (c *VariantsSearchCall) Do() (*SearchVariantsResponse, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(SearchVariantsResponse)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *SearchVariantsResponse
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
@@ -2814,8 +3048,8 @@ func (c *VariantsUpdateCall) Do() (*Variant, error) {
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := new(Variant)
-	if err := json.NewDecoder(res.Body).Decode(ret); err != nil {
+	var ret *Variant
+	if err := json.NewDecoder(res.Body).Decode(&ret); err != nil {
 		return nil, err
 	}
 	return ret, nil
