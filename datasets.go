@@ -98,6 +98,34 @@ func (p *paramDatasetsGet) run(cmd *cobra.Command, args []string) {
 	printDataset(res, 0)
 }
 
+type paramDatasetsDelete struct {
+	datasetId string
+}
+
+func (p *paramDatasetsDelete) command() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete",
+		Short: "delete a dataset",
+		Run:   p.run,
+	}
+	cmd.Flags().StringVarP(&p.datasetId, "dataset-id", "", "",
+		"The dataset ID to retrieve.")
+	return cmd
+}
+
+func (p *paramDatasetsDelete) run(cmd *cobra.Command, args []string) {
+	client := NewApiClient()
+
+	if p.datasetId == "" {
+		log.Fatal("Delete requires a dataset ID.")
+	}
+	query := client.Datasets.Delete(p.datasetId)
+	err := query.Do()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 var datasetsCmd *cobra.Command
 
 func init() {
@@ -108,6 +136,9 @@ func init() {
 			cmd.Help()
 		},
 	}
+
+	datasetsDelete := &paramDatasetsDelete{}
+	datasetsCmd.AddCommand(datasetsDelete.command())
 
 	datasetsGet := &paramDatasetsGet{}
 	datasetsCmd.AddCommand(datasetsGet.command())

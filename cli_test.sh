@@ -23,3 +23,5 @@ api-client-go datasets list --use-oauth=oauth_for_travis.json | grep " 376902546
 
 ./api-client-go datasets get --use-oauth=oauth_for_travis.json | grep "ID: 376902546192,"
 ./api-client-go datasets get --use-oauth=oauth_for_travis.json --dataset-id=376902546192 | grep "Is Public: true"
+
+./api-client-go datasets delete --use-oauth=oauth_for_travis.json 2>&1 | grep "requires a dataset ID"
