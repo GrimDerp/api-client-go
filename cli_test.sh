@@ -9,7 +9,7 @@ api-client-go help 2>&1 | grep 'Datasets'
 
 openssl aes-256-ctr -d -a -in oauth_for_travis.pem.enc -out oauth_for_travis.pem -pass "pass:$KEY_PASSWORD"
 
-api-client-go readsets search --use-oauth=oauth_for_travis.json --dataset-ids=376902546192 | grep ChhDSkRta1luOENoQ2otTmJNb2UzaWxiWUI=
+api-client-go readsets search --use-oauth=oauth_for_travis.json --dataset-ids=376902546192 | grep 1000genomes.ebi.ac
 
 api-client-go readsets search --use-oauth=oauth_for_travis.json --dataset-ids=376902546192 --page-token=ChhDSkRta1luOENoQ2otTmJNb2UzaWxiWUI= | grep "Page Token"
 
@@ -21,7 +21,7 @@ api-client-go reads search --use-oauth=oauth_for_travis.json --readset-ids=CJDmk
 
 api-client-go datasets list --use-oauth=oauth_for_travis.json | grep " 376902546192,"
 
-./api-client-go datasets get --use-oauth=oauth_for_travis.json | grep "ID: 376902546192,"
-./api-client-go datasets get --use-oauth=oauth_for_travis.json --dataset-id=376902546192 | grep "Is Public: true"
+api-client-go datasets get --use-oauth=oauth_for_travis.json | grep "ID: 376902546192,"
+api-client-go datasets get --use-oauth=oauth_for_travis.json --dataset-id=376902546192 | grep "Is Public: true"
 
-./api-client-go datasets delete --use-oauth=oauth_for_travis.json 2>&1 | grep "requires a dataset ID"
+api-client-go datasets delete --use-oauth=oauth_for_travis.json 2>&1 | grep "requires a dataset ID"
