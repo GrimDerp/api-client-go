@@ -71,6 +71,33 @@ func (p *paramDatasetsList) run(cmd *cobra.Command, args []string) {
 	}
 }
 
+type paramDatasetsGet struct {
+	datasetId string
+}
+
+func (p *paramDatasetsGet) command() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "get",
+		Short: "get a dataset by ID",
+		Run:   p.run,
+	}
+	cmd.Flags().StringVarP(&p.datasetId, "dataset-id", "", "376902546192",
+		"The dataset ID to retrieve.")
+	return cmd
+}
+
+func (p *paramDatasetsGet) run(cmd *cobra.Command, args []string) {
+	client := NewApiClient()
+
+	query := client.Datasets.Get(p.datasetId)
+	res, err := query.Do()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	printDataset(res, 0)
+}
+
 var datasetsCmd *cobra.Command
 
 func init() {
@@ -81,6 +108,9 @@ func init() {
 			cmd.Help()
 		},
 	}
+
+	datasetsGet := &paramDatasetsGet{}
+	datasetsCmd.AddCommand(datasetsGet.command())
 
 	datasetsList := &paramDatasetsList{}
 	datasetsCmd.AddCommand(datasetsList.command())
