@@ -14,8 +14,8 @@ API`_ with the `Go programming language`_.
 Getting started
 ---------------
 
-* First, you'll need a valid client ID and secret. Follow the `authentication
-  instructions <https://developers.google.com/genomics#authenticate>`_ and
+* First, you'll need a valid client ID and secret. Follow the `sign up
+  instructions <https://developers.google.com/genomics>`_ and
   download the JSON file for ``installed application``.
 
 * Install the example with::
