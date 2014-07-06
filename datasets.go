@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	genomics "github.com/googlegenomics/api-client-go/v1beta"
+	genomics "code.google.com/p/google-api-go-client/genomics/v1beta"
 	"github.com/spf13/cobra"
 )
 
