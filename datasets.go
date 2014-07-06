@@ -15,8 +15,7 @@ import (
 
 func printDataset(ds *genomics.Dataset, indentLevel int) {
 	indent(indentLevel)
-	fmt.Printf("ID: %v, Project ID: %v, Is Public: %v\n",
-		ds.Id, ds.ProjectId, ds.IsPublic)
+	fmt.Printf("ID: %v, Project ID: %v, Is Public: %v\n", ds.Id, ds.ProjectId, ds.IsPublic)
 }
 
 type paramDatasetsList struct {
@@ -43,23 +42,16 @@ func (p *paramDatasetsList) command() *cobra.Command {
 func (p *paramDatasetsList) run(cmd *cobra.Command, args []string) {
 	client := NewApiClient()
 
-	fmt.Fprintf(os.Stderr, "Listing datasets in project %v...\n",
-		p.projectId)
+	fmt.Fprintf(os.Stderr, "Listing datasets in project %v...\n", p.projectId)
 
-	query := client.Datasets.List()
-	query.MaxResults(p.maxResults)
-	query.ProjectId(p.projectId)
+	query := client.Datasets.List().MaxResults(p.maxResults).ProjectId(p.projectId)
 	if p.pageToken != "" {
 		query.PageToken(p.pageToken)
 	}
+
 	res, err := query.Do()
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	if len(res.Datasets) == 0 {
-		fmt.Fprintf(os.Stderr, "No match for %s.\n", p.projectId)
-		return
 	}
 
 	for _, ds := range res.Datasets {
